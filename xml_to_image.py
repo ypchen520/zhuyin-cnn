@@ -31,6 +31,7 @@ for dirpath, dirnames, filenames in os.walk(_xml_root_dir):
         # create a folder for pid
         img_folder_path = os.path.join(_img_root_dir, pid)
         print(img_folder_path)
+        os.makedirs(img_folder_path, exist_ok=True)
         for filename in filenames:
             # create the image
             img_arr = np.zeros((_canvas_size, _canvas_size, 3))
@@ -55,5 +56,6 @@ for dirpath, dirnames, filenames in os.walk(_xml_root_dir):
             img_file_path = os.path.join(img_folder_path, img_filename)
             cnt += 1
             # os.makedirs(img_file_path, exist_ok=True)
+            img.save(img_file_path)
 print(cnt)
             
