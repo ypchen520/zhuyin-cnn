@@ -1,1 +1,1 @@
-# Fine-tune CNN for Zhuyin symbol recognition
+# Fine-tune CNN for Touchscreen Gesture Recognition Zhuyin Symbols
