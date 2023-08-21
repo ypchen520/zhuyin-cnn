@@ -15,8 +15,8 @@ import numpy as np
 from PIL import Image
 import numpy as ny
 
-_xml_root_dir = "./dataset-xml"
-_img_root_dir = "./dataset-img"
+_xml_root_dir = "../dataset-xml"
+_img_root_dir = "../dataset-img"
 _pid_pattern = "p\d{3}"
 _canvas_size = 581
 _x_offset = 0
