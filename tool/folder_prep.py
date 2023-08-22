@@ -13,16 +13,11 @@ import re
 from lxml import etree
 import numpy as np
 from PIL import Image
-import numpy as ny
+import random
 
-_xml_root_dir = "../dataset-xml"
 _img_root_dir = "../dataset-img"
 _data_root_dir = "../cnn-pytorch/data/zmg"
 _pid_pattern = "p\d{3}"
-_canvas_size = 581
-_x_offset = 0
-_y_offset = 120
-_target_size = 160
 
 def parse_and_draw():
     """
@@ -36,28 +31,26 @@ def parse_and_draw():
     cnt = 0
     for dirpath, dirnames, filenames in os.walk(_img_root_dir):
         # Loop through the filenames and print their full paths
-        print(dirpath)
-        print(dirnames)
+        # print(dirpath)
+        # print(dirnames)
         # print(filenames)
         match = re.match(_pid_pattern, dirpath[-4:])
         if match:
-            pid = dirpath[-4:]
-            print(pid)
-            # create a folder for pid
-            img_folder_path = os.path.join(_img_root_dir, pid)
-            print(img_folder_path)
-            # os.makedirs(_data_root_dir, exist_ok=True)
+            pid = dirpath[-4:]            
             for filename in filenames:
                 if filename == ".DS_Store":
                     continue
-                # Use os.path.join to create the full file path
-                file_path = os.path.join(dirpath, filename)
-                img_filename = filename[:-3]+"png"
-                # img = Image.fromarray(np.uint8(img_arr*255))
-                img_file_path = os.path.join(img_folder_path, img_filename)
+                filename = filename.split(".")[0] # remove .png
+                label = filename[:-2]
+                # print(label)
+                train_folder_path = os.path.join(_data_root_dir, "train", label)
+                val_folder_path = os.path.join(_data_root_dir, "val", label)
+                os.makedirs(train_folder_path, exist_ok=True)
+                os.makedirs(val_folder_path, exist_ok=True)
+
+                img_filename = filename+".png"
+                img_file_path = os.path.join(dirpath, img_filename)
                 cnt += 1
-                # os.makedirs(img_file_path, exist_ok=True)
-                # img.save(img_file_path)
     print(cnt)
 
 if __name__ == "__main__":

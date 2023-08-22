@@ -21,6 +21,15 @@ device = (
     else 'cpu'
 )
 
+data_transforms = {
+    'train': transforms.Compose([
+
+    ]),
+    'val': transforms.Compose([
+
+    ]),
+}
+
 def get_device():
     print(f"Using {device} device")
     return device

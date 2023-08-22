@@ -13,7 +13,6 @@ import re
 from lxml import etree
 import numpy as np
 from PIL import Image
-import numpy as ny
 
 _xml_root_dir = "../dataset-xml"
 _img_root_dir = "../dataset-img"
