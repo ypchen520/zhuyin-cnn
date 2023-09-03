@@ -162,4 +162,5 @@ cython_debug/
 .DS_Store
 dataset-img/
 dataset-xml/
+dataset-kj-xml/
 hymenoptera_data/
