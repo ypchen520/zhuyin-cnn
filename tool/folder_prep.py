@@ -14,10 +14,12 @@ from lxml import etree
 import numpy as np
 from PIL import Image
 import random
+import shutil
 
 _img_root_dir = "../dataset-img"
 _data_root_dir = "../cnn-pytorch/data/zmg"
 _pid_pattern = "p\d{3}"
+_num_classes = 16
 
 def parse_and_draw():
     """
@@ -36,13 +38,17 @@ def parse_and_draw():
         # print(filenames)
         match = re.match(_pid_pattern, dirpath[-4:])
         if match:
-            pid = dirpath[-4:]            
+            pid = dirpath[-4:]
+            # get a list of random integer for train/val 
+            val_labels = {}
             for filename in filenames:
                 if filename == ".DS_Store":
                     continue
                 filename = filename.split(".")[0] # remove .png
-                label = filename[:-2]
-                # print(label)
+                label = filename[:-2] # get class label
+                index = filename[-2:]
+                
+                # create a folder in train/ and val/ for each label
                 train_folder_path = os.path.join(_data_root_dir, "train", label)
                 val_folder_path = os.path.join(_data_root_dir, "val", label)
                 os.makedirs(train_folder_path, exist_ok=True)
@@ -50,6 +56,21 @@ def parse_and_draw():
 
                 img_filename = filename+".png"
                 img_file_path = os.path.join(dirpath, img_filename)
+                # print(img_file_path)
+
+                # For each label, decide the ix that will be used for val first
+                if label not in val_labels:
+                    ix = random.randint(1,10)
+                    val_labels[label] = f"{ix:0{2}d}"
+
+                dst_img_filename = "-".join([filename,pid])+".png"
+                if index != val_labels[label]:
+                    # indices for training data
+                    dst_img_file_path = os.path.join(train_folder_path, dst_img_filename)
+                else:
+                    # index for val data
+                    dst_img_file_path = os.path.join(val_folder_path, dst_img_filename)
+                shutil.copy(img_file_path, dst_img_file_path)
                 cnt += 1
     print(cnt)
 

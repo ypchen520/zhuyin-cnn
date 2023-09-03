@@ -12,6 +12,16 @@ import os
 from PIL import Image
 from tempfile import TemporaryDirectory # TODO
 
+import logging
+
+logging.basicConfig(
+    level = logging.INFO,
+    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers = [
+        logging.StreamHandler()
+    ]
+)
+
 cudnn.benchmark = True # TODO
 plt.ion() # interactive mode
 
@@ -21,18 +31,232 @@ device = (
     else 'cpu'
 )
 
+# Data augmentation and normalization for training
+# Just normalization for validation
+rotation_range = (-15, 15)
 data_transforms = {
     'train': transforms.Compose([
-
+        # transforms.RandomResizedCrop(224), # probably won't work for the zhuyin data
+        # transforms.RandomHorizontalFlip(), # probably won't work for the zhuyin data
+        # transforms.CenterCrop(224),
+        transforms.RandomRotation(rotation_range),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'val': transforms.Compose([
-
+        transforms.Resize(256),
+        # transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
 }
+
+# data_dir = "data/hymenoptera_data" # when the zhuyin data is ready, change this and test
+data_dir = "data/zmg"
+image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ["train", "val"]}
+dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4) for x in ["train", "val"]}
+dataset_sizes = {x: len(image_datasets[x]) for x in ["train", "val"]}
+class_names = image_datasets["train"].classes # ImageFolder.classes
+
+# Visualize a few images
+
+def imshow(inp, title=None):
+    logging.getLogger(imshow.__name__).debug("Display image for Tensor")
+    inp = inp.numpy().transpose((1,2,0)) # (C, H, W) to (H, W, C)
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    inp = std * inp + mean
+    inp = np.clip(inp, 0, 1)
+    plt.imshow(inp)
+    if title:
+        plt.title(title)
+    plt.pause(10)
+
+def visualize(dataloaders):
+    inputs, classes = next(iter(dataloaders["train"]))
+    print(class_names)
+    print(dataset_sizes["train"])
+    print(type(inputs))
+    print(inputs.shape)
+    print(classes.shape)
+    out = torchvision.utils.make_grid(inputs)
+    imshow(out, title=[class_names[x] for x in classes])
+
+# Visualizing the model predictions
+def visualize_model(model, num_images=6):
+    was_training = model.training # boolean represents whether this module is in training or evaluation mode
+    model.eval()
+    images_so_far = 0
+    fig = plt.figure
+    with torch.no_grad():
+        for i, (inputs, labels) in enumerate(dataloaders["val"]):
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, dim=1)
+
+            for j in range(inputs.size()[0]):
+                images_so_far += 1
+                ax = plt.subplot(num_images//2, 2, images_so_far)
+                ax.axis("off")
+                ax.set_title(f"predicted: {class_names[preds[j]]}")
+                imshow(inputs.cpu().data[j]) # .cpu()
+
+                if images_so_far == num_images:
+                    model.train(mode=was_training)
+                    return
+        model.train(mode=was_training)
+
 
 def get_device():
     print(f"Using {device} device")
     return device
 
+def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+    """
+    A general fucntion for training a model.
+    """
+    since = time.time()
+    with TemporaryDirectory() as tempdir:
+        # print(tempdir)
+        best_model_params_path = os.path.join(tempdir, "best_model_params.pt")
+
+        torch.save(model.state_dict(), best_model_params_path)
+        best_acc = 0.0
+
+        for epoch in range(num_epochs):
+            logging.getLogger(train_model.__name__).info(f"Epoch {epoch}/{num_epochs-1}")
+
+            # Each epoch has a training and validation phase
+            for phase in ["train", "val"]:
+                if phase == "train":
+                    model.train()
+                else:
+                    model.eval()
+            
+                running_loss = 0
+                running_corrects = 0
+
+                # Iterate over data
+                for inputs, labels in dataloaders[phase]:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+
+                    # forward
+                    # track history if only in train
+                    with torch.set_grad_enabled(phase == "train"):
+                        # print("forward")
+                        outputs = model(inputs)
+                        _, preds = torch.max(outputs, dim=1)
+
+                        # print("loss")
+                        loss = criterion(outputs, labels)
+
+                        # backward + optimzie if in training phase
+                        if phase == "train":
+                            # print("backprop")
+                            loss.backward()
+                            optimizer.step()
+                    
+                    # statistics
+                    running_loss += loss.item() * inputs.size(0) # batch size
+                    running_corrects += torch.sum(preds == labels.data)
+
+                if phase == "train":
+                    scheduler.step()
+
+                epoch_loss = running_loss / dataset_sizes[phase]
+                epoch_acc = running_corrects.double() / dataset_sizes[phase] # double() returns a Tensor, item() returns a Python number object
+                
+                print(f"{phase} Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}")
+
+                # deep copy the model
+                if phase == "val":
+                    best_acc = epoch_acc
+                    torch.save(model.state_dict(), best_model_params_path)
+            
+            print()
+        
+        time_elapsed = time.time() - since
+        print(f"Training complete in {time_elapsed//60:.0f}m {time_elapsed % 60:.0f}s")
+        print(f"Best val Acc: {best_acc:.4f}")
+
+        model.load_state_dict(torch.load(best_model_params_path))
+    return model
+
+# Finetuning the ConvNet
+def finetuning():
+    """
+    Load a pretrained model and reset final fully connected layer
+    """
+    model_ft = models.resnet18(weights="IMAGENET1K_V1")
+    # print(model_ft)
+
+    num_ftrs = model_ft.fc.in_features
+    model_ft.fc = nn.Linear(num_ftrs, len(class_names))
+    # print(model_ft)
+    model_ft = model_ft.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Observe that all parameters are being optimized
+    optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
+    # Decay LR by a factor of 0.1 every 7 epochs
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+    
+    return model_ft
+
+
 if __name__ == "__main__":
     get_device()
+    # visualize(dataloaders)
+    # finetuning()
+
+    model_ft = models.resnet34(weights="IMAGENET1K_V1")
+    # print(model_ft)
+
+    num_ftrs = model_ft.fc.in_features
+    model_ft.fc = nn.Linear(num_ftrs, len(class_names))
+    # print(model_ft)
+    model_ft = model_ft.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+
+    # Observe that all parameters are being optimized
+    optimizer_ft = optim.SGD(model_ft.parameters(), lr=0.001, momentum=0.9)
+
+    # Decay LR by a factor of 0.1 every 7 epochs
+    exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
+    
+    model_ft = train_model(model_ft, criterion=criterion, optimizer=optimizer_ft, scheduler=exp_lr_scheduler, num_epochs=35)
+
+    # ConvNet as fixed feature extractor
+
+    """
+    freeze all the network except the final layer
+    set `requires_grad=False` to freeze the parameters so that gradients are not computed in `backward()`
+    """
+
+    # model_conv = models.resnet18(weights="IMAGENET1K_V1")
+    # for param in model_conv.parameters():
+    #     param.requires_grad=False
+
+    # # Parameters of newly constructed modules have requires_grad=True by default
+    # num_ftrs = model_conv.fc.in_features
+    # model_conv.fc = nn.Linear(num_ftrs, len(class_names))
+
+    # model_conv.to(device)
+
+    # criterion = nn.CrossEntropyLoss()
+
+    # optimizer_conv = optim.SGD(model_conv.fc.parameters(), lr=0.001, momentum=0.9)
+
+    # # Decay LR by a factor of 0.1 every 7 epochs
+    # exp_lr_scheduler = lr_scheduler.StepLR(optimizer_conv, step_size=7, gamma=0.1)
+
+    # model_conv = train_model(model_conv, criterion, optimizer_conv, exp_lr_scheduler, num_epochs=25)
