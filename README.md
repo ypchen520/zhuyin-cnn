@@ -1,6 +1,6 @@
 # Fine-tune CNN for Touchscreen Gesture Recognition Zhuyin Symbols
 
-![Zhuyin](./img/zhuyin.gif)
+![Zhuyin](./figs/zhuyin.gif)
 
 ## Native PyTorch
 
