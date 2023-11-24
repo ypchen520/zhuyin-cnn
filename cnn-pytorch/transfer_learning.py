@@ -36,6 +36,7 @@ device = (
 rotation_range = (-15, 15)
 data_transforms = {
     'train': transforms.Compose([
+        transforms.Resize(224),
         # transforms.RandomResizedCrop(224), # probably won't work for the zhuyin data
         # transforms.RandomHorizontalFlip(), # probably won't work for the zhuyin data
         # transforms.CenterCrop(224),
@@ -44,7 +45,8 @@ data_transforms = {
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ]),
     'val': transforms.Compose([
-        transforms.Resize(256),
+        # transforms.Resize(256),
+        transforms.Resize(224),
         # transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
@@ -57,8 +59,13 @@ image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transf
 dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4) for x in ["train", "val"]}
 dataset_sizes = {x: len(image_datasets[x]) for x in ["train", "val"]}
 class_names = image_datasets["train"].classes # ImageFolder.classes
-
+print(len(dataloaders["train"]))
+print(len(dataloaders["val"]))
+print(dataset_sizes["train"])
+print(dataset_sizes["val"])
 # Visualize a few images
+
+# [TODO] Train Split
 
 def imshow(inp, title=None):
     logging.getLogger(imshow.__name__).debug("Display image for Tensor")
@@ -217,7 +224,8 @@ if __name__ == "__main__":
     # visualize(dataloaders)
     # finetuning()
 
-    model_ft = models.resnet34(weights="IMAGENET1K_V1")
+    # model_ft = models.resnet34(weights="IMAGENET1K_V1")
+    model_ft = models.resnet18(weights="IMAGENET1K_V1")
     # print(model_ft)
 
     num_ftrs = model_ft.fc.in_features
@@ -233,7 +241,7 @@ if __name__ == "__main__":
     # Decay LR by a factor of 0.1 every 7 epochs
     exp_lr_scheduler = lr_scheduler.StepLR(optimizer_ft, step_size=7, gamma=0.1)
     
-    model_ft = train_model(model_ft, criterion=criterion, optimizer=optimizer_ft, scheduler=exp_lr_scheduler, num_epochs=35)
+    model_ft = train_model(model_ft, criterion=criterion, optimizer=optimizer_ft, scheduler=exp_lr_scheduler, num_epochs=15)
 
     # ConvNet as fixed feature extractor
 

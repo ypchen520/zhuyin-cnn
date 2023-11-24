@@ -41,6 +41,7 @@ def parse_and_draw():
             pid = dirpath[-4:]
             # get a list of random integer for train/val 
             val_labels = {}
+            print(dirpath)
             for filename in filenames:
                 if filename == ".DS_Store":
                     continue
